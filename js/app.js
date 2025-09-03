@@ -1,20 +1,20 @@
 function registerServiceWorker() {
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js')
-      .then(registration => {
-        console.log('Service Worker registered', registration);
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js')
+            .then(registration => {
+                console.log('Service Worker registered', registration);
 
-        registration.onupdatefound = () => {
-          const installingWorker = registration.installing;
-          installingWorker.onstatechange = () => {
-            if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              window.location.reload();
-            }
-          };
-        };
-      })
-      .catch(err => console.error('Service Worker registration failed:', err));
-  }
+                registration.onupdatefound = () => {
+                    const installingWorker = registration.installing;
+                    installingWorker.onstatechange = () => {
+                        if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            window.location.reload();
+                        }
+                    };
+                };
+            })
+            .catch(err => console.error('Service Worker registration failed:', err));
+    }
 }
 
 // Initialize variables
@@ -23,32 +23,40 @@ let chart = null;
 const today = new Date();
 today.setHours(0, 0, 0, 0);
 
+// Add these variables at the top
+let userProfile = {
+    height: 0,
+    gender: '',
+    age: 0,
+    activityLevel: 'moderate'
+};
+
 // Toast Notification System
 function showToast(message, type = 'info') {
     const toast = document.createElement('div');
-    
+
     // Set toast styles based on type
     let bgColor, iconSvg;
-    
+
     switch (type) {
         case 'success':
             bgColor = 'bg-green-600';
             iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-                      </svg>`;
+                    </svg>`;
             break;
         case 'error':
             bgColor = 'bg-red-600';
             iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
-                      </svg>`;
+                    </svg>`;
             break;
         case 'info':
         default:
             bgColor = 'bg-indigo-600';
             iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
-                      </svg>`;
+                    </svg>`;
             break;
     }
 
@@ -81,7 +89,7 @@ function removeToast(toast) {
     // Add fade out animation
     toast.style.opacity = '0';
     toast.style.transform = 'translateY(10px)';
-    
+
     // Remove from DOM after animation
     setTimeout(() => {
         toast.remove();
@@ -114,7 +122,7 @@ function loadData() {
 function syncData() {
     const syncStatus = document.getElementById('syncStatus');
     syncStatus.classList.remove('hidden');
-    
+
     // Simulate network delay
     setTimeout(() => {
         syncStatus.classList.add('hidden');
@@ -130,10 +138,10 @@ function addWeightEntry(weight, date, notes) {
         date: date,
         notes: notes
     });
-    
+
     // Sort by date (newest first)
     weightData.sort((a, b) => new Date(b.date) - new Date(a.date));
-    
+
     saveData();
     updateUI();
     showToast('Weight entry saved successfully', 'success');
@@ -165,43 +173,44 @@ function updateUI() {
 // Update the weight history list
 function updateHistoryList() {
     const historyList = document.getElementById('historyList');
-    const noEntriesMessage = document.getElementById('noEntriesMessage');
-    
+    if (!historyList) return; // Guard clause for missing element
+
     // Clear the list
     historyList.innerHTML = '';
-    
+
+    const noEntriesMessage = document.getElementById('noEntriesMessage');
+
     if (weightData.length === 0) {
-        historyList.appendChild(noEntriesMessage);
+        // Create and append the no entries message if it doesn't exist
+        if (!noEntriesMessage) {
+            const message = document.createElement('p');
+            message.id = 'noEntriesMessage';
+            message.className = 'text-gray-500 text-center py-6';
+            message.textContent = 'No entries yet. Start by adding your weight above.';
+            historyList.appendChild(message);
+        }
         return;
     }
-    
-    noEntriesMessage.remove();
-    
+
+    // Remove no entries message if it exists
+    if (noEntriesMessage) {
+        noEntriesMessage.remove();
+    }
+
     // Add each entry to the list
     weightData.forEach(entry => {
         const entryElement = document.createElement('div');
-        entryElement.className = 'bg-gray-50 rounded-lg p-4 flex items-center justify-between group hover:bg-gray-100 transition';
+        entryElement.className = 'bg-gray-50 p-4 rounded-lg flex items-center justify-between';
         
-        // Calculate weight change from previous entry
-        let changeText = '';
-        const index = weightData.indexOf(entry);
-        if (index < weightData.length - 1) {
-            const change = entry.weight - weightData[index + 1].weight;
-            const changeSymbol = change >= 0 ? '+' : '';
-            changeText = `<span class="${change >= 0 ? 'text-red-500' : 'text-green-500'} text-sm font-medium">${changeSymbol}${change.toFixed(1)} kg</span>`;
-        }
+        const date = new Date(entry.date);
         
         entryElement.innerHTML = `
             <div>
-                <div class="flex items-center">
-                    <span class="font-bold text-lg">${entry.weight.toFixed(1)} kg</span>
-                    <span class="mx-2">•</span>
-                    <span class="text-gray-600">${formatDate(entry.date)}</span>
-                </div>
-                ${entry.notes ? `<p class="text-gray-500 text-sm mt-1">${entry.notes}</p>` : ''}
-                ${changeText ? `<p class="mt-1">${changeText} since previous entry</p>` : ''}
+                <p class="font-medium">${entry.weight.toFixed(1)} kg</p>
+                <p class="text-sm text-gray-600">${formatDate(date)}</p>
+                ${entry.notes ? `<p class="text-sm text-gray-500 mt-1">${entry.notes}</p>` : ''}
             </div>
-            <button class="delete-entry text-red-500 opacity-0 group-hover:opacity-100 transition p-1" data-id="${entry.id}">
+            <button onclick="deleteEntry(${entry.id})" class="text-red-600 hover:text-red-800 p-1">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
                 </svg>
@@ -209,12 +218,6 @@ function updateHistoryList() {
         `;
         
         historyList.appendChild(entryElement);
-        
-        // Add delete event listener
-        entryElement.querySelector('.delete-entry').addEventListener('click', function() {
-            const id = parseInt(this.getAttribute('data-id'));
-            deleteEntry(id);
-        });
     });
 }
 
@@ -230,12 +233,12 @@ function updateStats() {
         document.getElementById('weightTrend').innerHTML = '';
         return;
     }
-    
+
     // Get the current and starting weight
     const currentWeight = weightData[0].weight;
     const startingWeight = weightData[weightData.length - 1].weight;
     const totalChange = currentWeight - startingWeight;
-    
+
     // Calculate weekly change
     let weeklyChange = 0;
     if (weightData.length > 1) {
@@ -244,7 +247,7 @@ function updateStats() {
         const weeksDiff = Math.max(1, Math.round((lastDate - firstDate) / (7 * 24 * 60 * 60 * 1000)));
         weeklyChange = totalChange / weeksDiff;
     }
-    
+
     // Update the UI
     document.getElementById('currentWeightBig').textContent = `${currentWeight.toFixed(1)} kg`;
     document.getElementById('totalChangeBig').textContent = `${Math.abs(totalChange).toFixed(1)} kg`;
@@ -252,13 +255,13 @@ function updateStats() {
     document.getElementById('currentWeight').textContent = `${currentWeight.toFixed(1)} kg`;
     document.getElementById('totalChange').textContent = `${totalChange >= 0 ? '+' : ''}${totalChange.toFixed(1)} kg`;
     document.getElementById('weeklyChange').textContent = `${weeklyChange >= 0 ? '+' : ''}${weeklyChange.toFixed(1)} kg`;
-    
+
     // Update trend indicator
     const weightTrend = document.getElementById('weightTrend');
     if (weightData.length > 1) {
         const prevWeight = weightData[1].weight;
         const diff = currentWeight - prevWeight;
-        
+
         if (diff > 0) {
             weightTrend.innerHTML = `
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1 text-red-300" viewBox="0 0 20 20" fill="currentColor">
@@ -289,7 +292,7 @@ function updateChart() {
     const chartCanvas = document.getElementById('weightChart');
     const noDataMessage = document.getElementById('noDataMessage');
     const timeRange = document.getElementById('timeRange').value;
-    
+
     // Filter data based on selected time range
     let filteredData = [...weightData];
     if (timeRange !== 'all' && weightData.length > 0) {
@@ -297,23 +300,23 @@ function updateChart() {
         cutoffDate.setDate(cutoffDate.getDate() - parseInt(timeRange));
         filteredData = weightData.filter(entry => new Date(entry.date) >= cutoffDate);
     }
-    
+
     // Reverse for chronological display
     filteredData = filteredData.slice().reverse();
-    
+
     if (filteredData.length === 0) {
         chartCanvas.classList.add('hidden');
         noDataMessage.classList.remove('hidden');
         return;
     }
-    
+
     chartCanvas.classList.remove('hidden');
     noDataMessage.classList.add('hidden');
-    
+
     // Prepare data for the chart
     const labels = filteredData.map(entry => formatDate(entry.date));
     const weights = filteredData.map(entry => entry.weight);
-    
+
     // Create or update the chart
     if (chart) {
         chart.data.labels = labels;
@@ -352,7 +355,7 @@ function updateChart() {
                     },
                     tooltip: {
                         callbacks: {
-                            label: function(context) {
+                            label: function (context) {
                                 return `Weight: ${context.raw} kg`;
                             }
                         }
@@ -363,58 +366,176 @@ function updateChart() {
     }
 }
 
+// Add BMI and trend calculation functions
+function calculateBMI(weight, height) {
+    if (!height) return 0;
+    return weight / ((height / 100) * (height / 100));
+}
+
+function getBMICategory(bmi) {
+    if (bmi < 18.5) return { category: 'Underweight', color: 'text-blue-500' };
+    if (bmi < 25) return { category: 'Normal weight', color: 'text-green-500' };
+    if (bmi < 30) return { category: 'Overweight', color: 'text-yellow-500' };
+    return { category: 'Obese', color: 'text-red-500' };
+}
+
+function calculateTrends() {
+    if (weightData.length < 2) return null;
+
+    const weeklyData = {};
+    const monthlyData = {};
+
+    weightData.forEach(entry => {
+        const date = new Date(entry.date);
+        const weekKey = `${date.getFullYear()}-W${getWeekNumber(date)}`;
+        const monthKey = `${date.getFullYear()}-${date.getMonth() + 1}`;
+
+        if (!weeklyData[weekKey]) weeklyData[weekKey] = [];
+        if (!monthlyData[monthKey]) monthlyData[monthKey] = [];
+
+        weeklyData[weekKey].push(entry.weight);
+        monthlyData[monthKey].push(entry.weight);
+    });
+
+    return {
+        weekly: calculateAverages(weeklyData),
+        monthly: calculateAverages(monthlyData)
+    };
+}
+
+function calculateAverages(data) {
+    return Object.keys(data).map(key => ({
+        period: key,
+        average: data[key].reduce((a, b) => a + b) / data[key].length
+    }));
+}
+
+function getWeekNumber(date) {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+    const yearStart = new Date(d.getFullYear(), 0, 1);
+    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
+
+// Weight prediction system
+function predictWeight(days = 30) {
+    if (weightData.length < 7) return null;
+
+    const recentEntries = weightData.slice(0, 7);
+    const weightChanges = [];
+
+    for (let i = 0; i < recentEntries.length - 1; i++) {
+        weightChanges.push(recentEntries[i].weight - recentEntries[i + 1].weight);
+    }
+
+    const avgDailyChange = weightChanges.reduce((a, b) => a + b) / weightChanges.length;
+    const currentWeight = weightData[0].weight;
+
+    return currentWeight + (avgDailyChange * days);
+}
+
+// Reminder system
+function setupReminders() {
+    if (!('Notification' in window)) {
+        showToast('Notifications are not supported in this browser', 'error');
+        return;
+    }
+
+    Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+            scheduleReminders();
+        }
+    });
+}
+
+function scheduleReminders() {
+    // Check if we should send a weight entry reminder
+    const lastEntry = weightData[0];
+    const today = new Date();
+    const lastEntryDate = new Date(lastEntry?.date);
+
+    if (!lastEntry || today - lastEntryDate > 86400000) { // More than 24 hours
+        new Notification('Weight Entry Reminder', {
+            body: 'Don\'t forget to log your weight today!',
+            icon: './icons/scale-ico.png'
+        });
+    }
+}
+
 // Initialize the app
 function init() {
     // Set the current date as default
     document.getElementById('date').valueAsDate = today;
-    
+
     // Set the current year in the footer
     document.getElementById('currentYear').textContent = today.getFullYear();
-    
+
     // Load data from localStorage
     loadData();
-    
+
     // Register service worker
     registerServiceWorker();
-    
+
+    // Load user profile
+    loadUserProfile();
+
+    // Setup new features
+    setupReminders();
+
+    // Schedule weekly report generation
+    setInterval(() => {
+        const report = generateWeeklyReport();
+        if (report) {
+            showWeeklyReport(report);
+        }
+    }, 86400000); // Check daily
+
+    // Update predictions and BMI when weight is added
+    document.addEventListener('weightAdded', () => {
+        updateBMIDisplay();
+        updatePredictions();
+        updateTrendsChart();
+    });
+
     // Set up event listeners
-    document.getElementById('weightForm').addEventListener('submit', function(e) {
+    document.getElementById('weightForm').addEventListener('submit', function (e) {
         e.preventDefault();
         const weight = document.getElementById('weight').value;
         const date = document.getElementById('date').value;
         const notes = document.getElementById('notes').value;
-        
+
         if (!weight || !date) {
             showToast('Please fill in all required fields', 'error');
             return;
         }
-        
+
         addWeightEntry(weight, date, notes);
-        
+
         // Reset form
         document.getElementById('weight').value = '';
         document.getElementById('notes').value = '';
         document.getElementById('date').valueAsDate = today;
     });
-    
-    document.getElementById('clearData').addEventListener('click', function() {
+
+    document.getElementById('clearData').addEventListener('click', function () {
         if (confirm('Are you sure you want to clear all your weight data? This cannot be undone.')) {
             clearAllData();
         }
     });
-    
+
     document.getElementById('timeRange').addEventListener('change', updateChart);
-    
+
     // Setup install button for PWA
     let deferredPrompt;
     const installButton = document.getElementById('installButton');
-    
+
     window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
         deferredPrompt = e;
         installButton.classList.remove('hidden');
     });
-    
+
     installButton.addEventListener('click', async () => {
         if (!deferredPrompt) return;
         deferredPrompt.prompt();
@@ -425,13 +546,51 @@ function init() {
         deferredPrompt = null;
         installButton.classList.add('hidden');
     });
-    
+
     // Check online status
     updateOnlineStatus();
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
-    
+
     document.getElementById('startActivity').addEventListener('click', startActivityTracking);
+
+    document.getElementById('editProfile').addEventListener('click', () => {
+        // Pre-fill form with existing data
+        if (userProfile.height) {
+            document.getElementById('profileHeight').value = userProfile.height;
+            document.getElementById('profileAge').value = userProfile.age;
+            document.getElementById('profileGender').value = userProfile.gender;
+            document.getElementById('profileActivityLevel').value = userProfile.activityLevel;
+        }
+        document.getElementById('profileModal').classList.remove('hidden');
+    });
+
+    // Add profile modal event listeners
+    const editProfileButton = document.getElementById('editProfile');
+    const profileModal = document.getElementById('profileModal');
+
+    if (editProfileButton) {
+        editProfileButton.addEventListener('click', () => {
+            profileModal.classList.remove('hidden');
+            // Load existing profile data
+            const profileData = loadUserProfile();
+            if (profileData) {
+                document.getElementById('profileHeight').value = profileData.height || '';
+                document.getElementById('profileAge').value = profileData.age || '';
+                document.getElementById('profileGender').value = profileData.gender || '';
+                document.getElementById('profileActivityLevel').value = profileData.activityLevel || 'moderate';
+            }
+        });
+    }
+
+    // Close modal when clicking outside
+    if (profileModal) {
+        profileModal.addEventListener('click', (e) => {
+            if (e.target === profileModal) {
+                profileModal.classList.add('hidden');
+            }
+        });
+    }
 }
 
 // Update online status indicator
@@ -548,15 +707,15 @@ function calculateDistance(point1, point2) {
     const R = 6371; // Earth's radius in km
     const dLat = toRad(point2.lat - point1.lat);
     const dLon = toRad(point2.lng - point1.lng);
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(toRad(point1.lat)) * Math.cos(toRad(point2.lat)) * 
-              Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(point1.lat)) * Math.cos(toRad(point2.lat)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
 }
 
 function toRad(degrees) {
-    return degrees * (Math.PI/180);
+    return degrees * (Math.PI / 180);
 }
 
 function calculateSpeed(distance) {
@@ -568,14 +727,14 @@ function updateActivityStats(speed) {
     document.getElementById('distanceToday').textContent = `${totalDistance.toFixed(2)} km`;
     document.getElementById('stepsToday').textContent = totalSteps.toString();
     document.getElementById('currentSpeed').textContent = `${speed.toFixed(1)} km/h`;
-    
+
     // Calculate calories burned (rough estimation)
     // MET value for running varies from 7-14 depending on speed
     const met = speed < 8 ? 7 : speed < 12 ? 10 : 14;
     const weight = weightData[0]?.weight || 70; // Use current weight or default to 70kg
     const duration = (Date.now() - startTime) / 3600000; // hours
     const calories = met * weight * duration;
-    
+
     document.getElementById('caloriesBurned').textContent = `${Math.round(calories)} kcal`;
 }
 
@@ -583,7 +742,7 @@ function updateActivityDuration() {
     const duration = Date.now() - startTime;
     const minutes = Math.floor(duration / 60000);
     const seconds = Math.floor((duration % 60000) / 1000);
-    document.getElementById('activityDuration').textContent = 
+    document.getElementById('activityDuration').textContent =
         `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 }
 
@@ -592,11 +751,11 @@ function updateWeightFromActivity() {
     // 7700 calories = 1 kg of body fat
     const calories = parseInt(document.getElementById('caloriesBurned').textContent);
     const weightLoss = calories / 7700;
-    
+
     if (weightData.length > 0) {
         const currentWeight = weightData[0].weight;
         const newWeight = currentWeight - weightLoss;
-        
+
         // Add new weight entry
         addWeightEntry(
             newWeight,
@@ -606,5 +765,193 @@ function updateWeightFromActivity() {
     }
 }
 
+// Weekly report generation
+function generateWeeklyReport() {
+    if (weightData.length === 0) return null;
+
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+    const weekData = weightData.filter(entry => new Date(entry.date) >= oneWeekAgo);
+    if (weekData.length === 0) return null;
+
+    const startWeight = weekData[weekData.length - 1].weight;
+    const endWeight = weekData[0].weight;
+    const weightChange = endWeight - startWeight;
+    const avgWeight = weekData.reduce((sum, entry) => sum + entry.weight, 0) / weekData.length;
+
+    const activities = weekData
+        .filter(entry => entry.notes?.includes('Automatic update'))
+        .length;
+
+    return {
+        startWeight,
+        endWeight,
+        weightChange,
+        avgWeight,
+        activities,
+        trend: weightChange < 0 ? 'decreasing' : 'increasing',
+        bmi: calculateBMI(endWeight, userProfile.height)
+    };
+}
+
+// User profile functions
+function loadUserProfile() {
+    try {
+        const savedProfile = localStorage.getItem('userProfile');
+        if (!savedProfile) return false;
+
+        const parsed = JSON.parse(savedProfile);
+
+        // Validate profile data
+        if (!parsed.height || parsed.height <= 0) {
+            throw new Error('Invalid height value');
+        }
+        if (!parsed.age || parsed.age <= 0) {
+            throw new Error('Invalid age value');
+        }
+        if (!parsed.gender) {
+            throw new Error('Missing gender value');
+        }
+
+        userProfile = parsed;
+        updateHealthMetrics();
+        return true;
+    } catch (error) {
+        console.error('Error loading profile:', error);
+        localStorage.removeItem('userProfile');
+        showToast('Error loading profile data', 'error');
+        return false;
+    }
+}
+
+function saveUserProfile(profileData) {
+    userProfile = {
+        height: parseFloat(profileData.height),
+        age: parseInt(profileData.age),
+        gender: profileData.gender,
+        activityLevel: profileData.activityLevel
+    };
+    localStorage.setItem('userProfile', JSON.stringify(userProfile));
+    updateHealthMetrics();
+}
+
+function updateHealthMetrics() {
+    if (!userProfile.height || weightData.length === 0) {
+        resetHealthMetrics();
+        return;
+    }
+
+    try {
+        const currentWeight = weightData[0].weight;
+        const bmi = calculateBMI(currentWeight, userProfile.height);
+        if (isNaN(bmi) || !isFinite(bmi)) {
+            throw new Error('Invalid BMI calculation');
+        }
+
+        const bmiCategory = getBMICategory(bmi);
+        const tdee = calculateTDEE(currentWeight);
+
+        // Update UI with health metrics
+        document.getElementById('bmiValue').textContent = bmi.toFixed(1);
+        document.getElementById('bmiCategory').textContent = bmiCategory.category;
+        document.getElementById('bmiCategory').className = bmiCategory.color;
+        document.getElementById('tdeeValue').textContent = `${tdee.toFixed(0)} kcal`;
+    } catch (error) {
+        console.error('Error updating health metrics:', error);
+        resetHealthMetrics();
+        showToast('Error calculating health metrics', 'error');
+    }
+}
+
+function resetHealthMetrics() {
+    document.getElementById('bmiValue').textContent = '--';
+    document.getElementById('bmiCategory').textContent = '--';
+    document.getElementById('bmiCategory').className = '';
+    document.getElementById('tdeeValue').textContent = '--';
+}
+
+function calculateTDEE(weight) {
+    // Basic Metabolic Rate (BMR) using Mifflin-St Jeor Equation
+    let bmr;
+    if (userProfile.gender === 'male') {
+        bmr = (10 * weight) + (6.25 * userProfile.height) - (5 * userProfile.age) + 5;
+    } else {
+        bmr = (10 * weight) + (6.25 * userProfile.height) - (5 * userProfile.age) - 161;
+    }
+
+    // Activity Multiplier
+    const activityMultipliers = {
+        sedentary: 1.2,
+        light: 1.375,
+        moderate: 1.55,
+        very: 1.725,
+        extra: 1.9
+    };
+
+    return bmr * activityMultipliers[userProfile.activityLevel];
+}
+
+// BMI display update function
+function updateBMIDisplay() {
+    if (!userProfile.height || weightData.length === 0) {
+        document.getElementById('bmiValue').textContent = '--';
+        document.getElementById('bmiCategory').textContent = '--';
+        return;
+    }
+
+    const currentWeight = weightData[0].weight;
+    const bmi = calculateBMI(currentWeight, userProfile.height);
+    const bmiCategory = getBMICategory(bmi);
+
+    document.getElementById('bmiValue').textContent = bmi.toFixed(1);
+    document.getElementById('bmiCategory').textContent = bmiCategory.category;
+    document.getElementById('bmiCategory').className = bmiCategory.color;
+}
+
 // Initialize the app when the DOM is loaded
 document.addEventListener('DOMContentLoaded', init);
+
+// Add after profile modal event listener
+document.getElementById('profileForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    const profileData = {
+        height: document.getElementById('profileHeight').value,
+        age: document.getElementById('profileAge').value,
+        gender: document.getElementById('profileGender').value,
+        activityLevel: document.getElementById('profileActivityLevel').value
+    };
+
+    // Validate height
+    if (profileData.height <= 0) {
+        showToast('Height must be greater than 0', 'error');
+        return;
+    }
+
+    saveUserProfile(profileData);
+    document.getElementById('profileModal').classList.add('hidden');
+    showToast('Profile updated successfully', 'success');
+});
+
+// Add close button handler
+document.getElementById('profileModal').addEventListener('click', function (e) {
+    if (e.target === this) {
+        this.classList.add('hidden');
+    }
+});
+
+function validateProfileData(profile) {
+    if (!profile.height || profile.height <= 0) {
+        throw new Error('Invalid height');
+    }
+    if (!profile.age || profile.age <= 0) {
+        throw new Error('Invalid age');
+    }
+    if (!profile.gender || !['male', 'female', 'other'].includes(profile.gender)) {
+        throw new Error('Invalid gender');
+    }
+    if (!profile.activityLevel || !['sedentary', 'light', 'moderate', 'very', 'extra'].includes(profile.activityLevel)) {
+        throw new Error('Invalid activity level');
+    }
+    return true;
+}
