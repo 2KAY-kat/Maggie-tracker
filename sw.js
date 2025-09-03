@@ -1,11 +1,9 @@
 const CACHE_NAME = 'weight-tracker-cache-v1';
 const ASSETS_TO_CACHE = [
-  '/',                     // your index.html
+  '/',                     
   '/index.html',
-  '/js/app.js',            // your main JS
-  '/css/tailwind.css',     // local Tailwind CSS
-  '/favicon.ico',           // any icons
-  // add images, chart.js, or any other static files you need offline
+  '/js/app.js',            
+  '/favicon.ico',           
 ];
 
 // Install event – cache everything
