@@ -73,6 +73,46 @@
         </section>
 
         <section class="bg-white rounded-xl shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-indigo-600" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 3.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM2.5 10a7.5 7.5 0 1115 0 7.5 7.5 0 01-15 0z" clip-rule="evenodd"/>
+                </svg>
+                Activity Tracker
+            </h2>
+            <div class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-indigo-50 p-4 rounded-lg">
+                        <p class="text-xs text-indigo-700 font-medium">Distance Today</p>
+                        <p id="distanceToday" class="text-xl font-bold text-indigo-800">0.0 km</p>
+                    </div>
+                    <div class="bg-indigo-50 p-4 rounded-lg">
+                        <p class="text-xs text-indigo-700 font-medium">Steps Today</p>
+                        <p id="stepsToday" class="text-xl font-bold text-indigo-800">0</p>
+                    </div>
+                </div>
+                <div id="activityStatus" class="hidden">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-sm font-medium">Current Activity</span>
+                        <span id="activityDuration" class="text-sm text-indigo-600">00:00</span>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm">Speed</span>
+                            <span id="currentSpeed" class="text-sm font-medium">0.0 km/h</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm">Calories Burned</span>
+                            <span id="caloriesBurned" class="text-sm font-medium">0 kcal</span>
+                        </div>
+                    </div>
+                </div>
+                <button id="startActivity" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200">
+                    Start Tracking Activity
+                </button>
+            </div>
+        </section>
+
+        <section class="bg-white rounded-xl shadow-md p-6 mb-6">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-xl font-semibold flex items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-indigo-600" viewBox="0 0 20 20" fill="currentColor">

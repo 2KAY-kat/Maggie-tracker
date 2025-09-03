@@ -12,7 +12,7 @@
   "screenshots": [
     {
       "src": "./screenshots/app-home.png",
-      "sizes": "1280x720",
+      "sizes": "720x360",
       "type": "image/png",
       "form_factor": "wide"
     }
