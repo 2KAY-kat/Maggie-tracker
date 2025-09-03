@@ -7,17 +7,17 @@
   "theme_color": "#0ea5e9",
   "icons": [
     {
-      "src": "./icons/love-ico-weight.png",
+      "src": "./icons/graph-ico.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "./icons/graph-ico.png",
+      "src": "./icons/scale-ico.png",
       "sizes": "512x512",
       "type": "image/png"
     },
     {
-      "src": "./icons/scale-ico.png",
+      "src": "./icons/love-ico-weight.png",
       "sizes": "512x512",
       "type": "image/png"
     }
