@@ -823,10 +823,21 @@ function updateWeightFromActivity() {
         const currentWeight = weightData[0].weight;
         const newWeight = currentWeight - weightLoss;
 
+        function getMalawiTimeString() {
+            return new Date().toLocaleString('en-MW', {
+                timeZone: 'Africa/Blantyre',
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+            });
+        }
         // Add new weight entry
         addWeightEntry(
             newWeight,
-            new Date().toISOString().split('T')[0],
+            getMalawiTimeString(),
             `Automatic update after burning ${calories} kcal during activity`
         );
     }
