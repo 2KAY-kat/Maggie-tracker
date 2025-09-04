@@ -143,8 +143,11 @@ function addWeightEntry(weight, date, notes) {
     weightData.sort((a, b) => new Date(b.date) - new Date(a.date));
 
     saveData();
-    updateUI();
+    updateUI(); // This will call updateTrendsChart
     showToast('Weight entry saved successfully', 'success');
+    
+    // Explicitly update trends after new data
+    updateTrendsChart();
 }
 
 // Delete a weight entry
@@ -168,6 +171,9 @@ function updateUI() {
     updateHistoryList();
     updateStats();
     updateChart();
+    updateTrendsChart(); // Add this line
+    const report = generateWeeklyReport();
+    if (report) showWeeklyReport(report);
 }
 
 // Update the weight history list
@@ -418,6 +424,12 @@ function getWeekNumber(date) {
     return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
 }
 
+function getWeekKey(date) {
+    const year = date.getFullYear();
+    const weekNumber = getWeekNumber(date);
+    return `${year}-W${weekNumber.toString().padStart(2, '0')}`;
+}
+
 // Weight prediction system
 function predictWeight(days = 30) {
     if (weightData.length < 7) return null;
@@ -590,6 +602,28 @@ function init() {
                 profileModal.classList.add('hidden');
             }
         });
+    }
+
+    // Add tailwind.config
+    tailwind.config = {
+        theme: {
+            extend: {
+                animation: {
+                    'fade-in': 'fadeIn 0.3s ease-in-out',
+                    'fade-out': 'fadeOut 0.3s ease-in-out'
+                },
+                keyframes: {
+                    fadeIn: {
+                        '0%': { opacity: '0', transform: 'translateY(10px)' },
+                        '100%': { opacity: '1', transform: 'translateY(0)' }
+                    },
+                    fadeOut: {
+                        '0%': { opacity: '1', transform: 'translateY(0)' },
+                        '100%': { opacity: '0', transform: 'translateY(10px)' }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -795,6 +829,51 @@ function generateWeeklyReport() {
     };
 }
 
+function showWeeklyReport(report) {
+    const weeklyReport = document.getElementById('weeklyReport');
+    if (!weeklyReport || weightData.length < 2) return;
+
+    const weeklyStats = calculateWeeklyStats();
+    
+    weeklyReport.innerHTML = `
+        <div class="space-y-3">
+            <h3 class="font-medium text-gray-700">Weekly Progress Summary</h3>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-white p-3 rounded-lg shadow-sm">
+                    <p class="text-sm text-gray-600">Weekly Change</p>
+                    <p class="text-lg font-semibold ${weeklyStats.change < 0 ? 'text-green-600' : 'text-red-600'}">
+                        ${weeklyStats.change.toFixed(2)} kg/week
+                    </p>
+                </div>
+                <div class="bg-white p-3 rounded-lg shadow-sm">
+                    <p class="text-sm text-gray-600">Trend</p>
+                    <p class="text-lg font-semibold ${weeklyStats.trend < 0 ? 'text-green-600' : 'text-red-600'}">
+                        ${weeklyStats.trend < 0 ? '↓ Decreasing' : '↑ Increasing'}
+                    </p>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function calculateWeeklyStats() {
+    const recentEntries = weightData.slice(0, Math.min(7, weightData.length));
+    const weeklyChange = recentEntries.length > 1 
+        ? (recentEntries[0].weight - recentEntries[recentEntries.length - 1].weight) 
+        : 0;
+
+    const weeklyData = calculateWeeklyAverages();
+    const trendLine = calculateTrendLine(weeklyData.averages);
+    const trend = trendLine.length > 1 
+        ? trendLine[trendLine.length - 1] - trendLine[0]
+        : 0;
+
+    return {
+        change: weeklyChange,
+        trend: trend
+    };
+}
+
 // User profile functions
 function loadUserProfile() {
     try {
@@ -954,4 +1033,143 @@ function validateProfileData(profile) {
         throw new Error('Invalid activity level');
     }
     return true;
+}
+
+// Trends chart update function
+function updateTrendsChart() {
+    const trendsChart = document.getElementById('trendsChart');
+    if (!trendsChart || weightData.length < 2) {
+        if (trendsChart) {
+            trendsChart.style.display = 'none';
+        }
+        return;
+    }
+
+    trendsChart.style.display = 'block';
+
+    // Destroy existing chart if it exists
+    if (window.trendsChartInstance) {
+        window.trendsChartInstance.destroy();
+    }
+
+    const weeklyData = calculateWeeklyAverages();
+    
+    // Calculate trend line
+    const trendLineData = calculateTrendLine(weeklyData.averages);
+    
+    window.trendsChartInstance = new Chart(trendsChart, {
+        type: 'line',
+        data: {
+            labels: weeklyData.labels,
+            datasets: [
+                {
+                    label: 'Weekly Average',
+                    data: weeklyData.averages,
+                    borderColor: 'rgb(99, 102, 241)',
+                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                    tension: 0.1,
+                    fill: true
+                },
+                {
+                    label: 'Trend Line',
+                    data: trendLineData,
+                    borderColor: 'rgba(255, 99, 132, 0.8)',
+                    borderDash: [5, 5],
+                    fill: false,
+                    tension: 0
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `Weight: ${context.raw.toFixed(1)} kg`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    title: {
+                        display: true,
+                        text: 'Weight (kg)'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Week'
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Add trend line calculation
+function calculateTrendLine(averages) {
+    if (averages.length < 2) return [];
+
+    const n = averages.length;
+    const xs = Array.from({length: n}, (_, i) => i);
+    const sum_x = xs.reduce((a, b) => a + b, 0);
+    const sum_y = averages.reduce((a, b) => a + b, 0);
+    const sum_xy = xs.map((x, i) => x * averages[i]).reduce((a, b) => a + b, 0);
+    const sum_xx = xs.map(x => x * x).reduce((a, b) => a + b, 0);
+
+    const slope = (n * sum_xy - sum_x * sum_y) / (n * sum_xx - sum_x * sum_x);
+    const intercept = (sum_y - slope * sum_x) / n;
+
+    return xs.map(x => slope * x + intercept);
+}
+
+// Place this above calculateWeeklyAverages
+function calculateWeeklyAverages() {
+    if (weightData.length < 2) {
+        return {
+            labels: [],
+            averages: []
+        };
+    }
+
+    // Sort data chronologically first
+    const sortedData = [...weightData].sort((a, b) => 
+        new Date(a.date) - new Date(b.date)
+    );
+
+    // Group by weeks
+    const weeklyWeights = {};
+    sortedData.forEach(entry => {
+        const date = new Date(entry.date);
+        const weekKey = getWeekKey(date);
+        
+        if (!weeklyWeights[weekKey]) {
+            weeklyWeights[weekKey] = {
+                weights: [],
+                dates: []
+            };
+        }
+        weeklyWeights[weekKey].weights.push(entry.weight);
+        weeklyWeights[weekKey].dates.push(date);
+    });
+
+    // Sort weeks chronologically
+    const sortedWeeks = Object.keys(weeklyWeights).sort();
+
+    return {
+        labels: sortedWeeks.map(week => {
+            const firstDate = weeklyWeights[week].dates[0];
+            return firstDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }),
+        averages: sortedWeeks.map(week => {
+            const weights = weeklyWeights[week].weights;
+            const average = weights.reduce((sum, weight) => sum + weight, 0) / weights.length;
+            return Number(average.toFixed(1));
+        })
+    };
 }
