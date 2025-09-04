@@ -23,7 +23,7 @@ let chart = null;
 const today = new Date();
 today.setHours(0, 0, 0, 0);
 
-// Add these variables at the top
+// user profile variables 
 let userProfile = {
     height: 0,
     gender: '',
@@ -35,7 +35,7 @@ let userProfile = {
 function showToast(message, type = 'info') {
     const toast = document.createElement('div');
 
-    // Set toast styles based on type
+    // Seting toast styles based on type
     let bgColor, iconSvg;
 
     switch (type) {
@@ -171,15 +171,16 @@ function updateUI() {
     updateHistoryList();
     updateStats();
     updateChart();
-    updateTrendsChart(); // Add this line
+    updateTrendsChart(); 
     const report = generateWeeklyReport();
     if (report) showWeeklyReport(report);
+    updatePredictions();
 }
 
 // Update the weight history list
 function updateHistoryList() {
     const historyList = document.getElementById('historyList');
-    if (!historyList) return; // Guard clause for missing element
+    if (!historyList) return;  
 
     // Clear the list
     historyList.innerHTML = '';
@@ -372,7 +373,7 @@ function updateChart() {
     }
 }
 
-// Add BMI and trend calculation functions
+// BMI and trend calculation functions
 function calculateBMI(weight, height) {
     if (!height) return 0;
     return weight / ((height / 100) * (height / 100));
@@ -416,12 +417,12 @@ function calculateAverages(data) {
     }));
 }
 
-function getWeekNumber(date) {
-    const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
-    d.setDate(d.getDate() + 4 - (d.getDay() || 7));
-    const yearStart = new Date(d.getFullYear(), 0, 1);
-    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+function getWeekNumber(date) { // i figgured the d variable was a sus move why not give it something solid like dated
+    const dated = new Date(date);
+    dated.setHours(0, 0, 0, 0);
+    dated.setDate(dated.getDate() + 4 - (dated.getDay() || 7));
+    const yearStart = new Date(dated.getFullYear(), 0, 1);
+    return Math.ceil((((dated - yearStart) / 86400000) + 1) / 7);
 }
 
 function getWeekKey(date) {
@@ -475,7 +476,7 @@ function scheduleReminders() {
     }
 }
 
-// Initialize the app
+// Initialize the app after all 
 function init() {
     // Set the current date as default
     document.getElementById('date').valueAsDate = today;
@@ -492,7 +493,7 @@ function init() {
     // Load user profile
     loadUserProfile();
 
-    // Setup new features
+    // Setup notifications
     setupReminders();
 
     // Schedule weekly report generation
@@ -642,7 +643,7 @@ function updateOnlineStatus() {
     }
 }
 
-// Add these variables after the existing declarations
+// the activity tracker variables for distance, number of steps ....
 let isTracking = false;
 let activityTimer = null;
 let startTime = null;
@@ -651,7 +652,7 @@ let totalDistance = 0;
 let totalSteps = 0;
 let lastLocation = null;
 
-// Add this function to handle activity tracking
+// the function to handle activity tracking
 function startActivityTracking() {
     if (!navigator.geolocation) {
         showToast('Geolocation is not supported by your browser', 'error');
@@ -714,6 +715,7 @@ function stopActivityTracking() {
     startTime = null;
 }
 
+// steps tracking based onn curent from old location on the geographiical position
 function updatePosition(position) {
     const currentLocation = {
         lat: position.coords.latitude,
@@ -737,7 +739,7 @@ function updatePosition(position) {
 }
 
 function calculateDistance(point1, point2) {
-    // Haversine formula to calculate distance between two points
+    // Haversine formula to calculate distance between two points its all math 
     const R = 6371; // Earth's radius in km
     const dLat = toRad(point2.lat - point1.lat);
     const dLon = toRad(point2.lng - point1.lng);
@@ -1128,7 +1130,6 @@ function calculateTrendLine(averages) {
     return xs.map(x => slope * x + intercept);
 }
 
-// Place this above calculateWeeklyAverages
 function calculateWeeklyAverages() {
     if (weightData.length < 2) {
         return {
@@ -1172,4 +1173,41 @@ function calculateWeeklyAverages() {
             return Number(average.toFixed(1));
         })
     };
+}
+
+function updatePredictions() {
+    const predictions = {
+        oneMonth: predictWeight(30),
+        twoMonths: predictWeight(60),
+        threeMonths: predictWeight(90)
+    };
+
+    if (!predictions.oneMonth) {
+        // Reset predictions if not enough data
+        document.getElementById('oneMonthPrediction').textContent = '--';
+        document.getElementById('twoMonthPrediction').textContent = '--';
+        document.getElementById('threeMonthPrediction').textContent = '--';
+        document.getElementById('oneMonthChange').textContent = '--';
+        document.getElementById('twoMonthChange').textContent = '--';
+        document.getElementById('threeMonthChange').textContent = '--';
+        return;
+    }
+
+    const currentWeight = weightData[0].weight;
+
+    // Update UI for each prediction period
+    updatePredictionUI('oneMonth', predictions.oneMonth, currentWeight);
+    updatePredictionUI('twoMonths', predictions.twoMonths, currentWeight);
+    updatePredictionUI('threeMonths', predictions.threeMonths, currentWeight);
+}
+
+function updatePredictionUI(period, predictedWeight, currentWeight) {
+    const change = predictedWeight - currentWeight;
+    const changeText = change >= 0 ? `+${change.toFixed(1)}` : `${change.toFixed(1)}`;
+    const element = period.charAt(0).toLowerCase() + period.slice(1);
+    
+    document.getElementById(`${element}Prediction`).textContent = `${predictedWeight.toFixed(1)} kg`;
+    document.getElementById(`${element}Change`).textContent = `${changeText} kg`;
+    document.getElementById(`${element}Change`).className = 
+        `text-sm ${change < 0 ? 'text-green-600' : 'text-red-600'}`;
 }
