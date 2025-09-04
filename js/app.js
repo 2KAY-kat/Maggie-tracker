@@ -1032,9 +1032,6 @@ function updateBMIDisplay() {
     document.getElementById('bmiCategory').className = bmiCategory.color;
 }
 
-// Initialize the app when the DOM is loaded
-document.addEventListener('DOMContentLoaded', init);
-
 // Add after profile modal event listener
 document.getElementById('profileForm').addEventListener('submit', function (e) {
     e.preventDefault();
@@ -1239,8 +1236,8 @@ function updatePredictions() {
 
     // Update UI for each prediction period
     updatePredictionUI('oneMonth', predictions.oneMonth, currentWeight);
-    updatePredictionUI('twoMonths', predictions.twoMonths, currentWeight);
-    updatePredictionUI('threeMonths', predictions.threeMonths, currentWeight);
+    updatePredictionUI('twoMonth', predictions.twoMonths, currentWeight);
+    updatePredictionUI('threeMonth', predictions.threeMonths, currentWeight);
 }
 
 function updatePredictionUI(period, predictedWeight, currentWeight) {
@@ -1253,3 +1250,5 @@ function updatePredictionUI(period, predictedWeight, currentWeight) {
     document.getElementById(`${element}Change`).className = 
         `text-sm ${change < 0 ? 'text-green-600' : 'text-red-600'}`;
 }
+
+document.addEventListener('DOMContentLoaded', init);
