@@ -449,6 +449,14 @@ function predictWeight(days = 30) {
 }
 
 // Reminder system
+const NOTIFICATION_INTERVAL = 6 * 60 * 60 * 1000; // 6 hours in milliseconds
+const NOTIFICATION_MESSAGES = [
+    "Time to check your weight!",
+    "Keep up with your weight goals!",
+    "Don't forget to log your progress!",
+    "Quick weight check?"
+];
+
 function setupReminders() {
     if (!('Notification' in window)) {
         showToast('Notifications are not supported in this browser', 'error');
@@ -457,22 +465,45 @@ function setupReminders() {
 
     Notification.requestPermission().then(permission => {
         if (permission === 'granted') {
+            // Initial check
             scheduleReminders();
+            
+            // Set up recurring check every 6 hours
+            setInterval(scheduleReminders, NOTIFICATION_INTERVAL);
+            
+            // Store the last notification time if not exists
+            if (!localStorage.getItem('lastNotificationTime')) {
+                localStorage.setItem('lastNotificationTime', Date.now().toString());
+            }
         }
     });
 }
 
 function scheduleReminders() {
-    // Check if we should send a weight entry reminder
     const lastEntry = weightData[0];
-    const today = new Date();
-    const lastEntryDate = new Date(lastEntry?.date);
+    const now = Date.now();
+    const lastNotificationTime = parseInt(localStorage.getItem('lastNotificationTime') || '0');
+    const timeSinceLastNotification = now - lastNotificationTime;
 
-    if (!lastEntry || today - lastEntryDate > 86400000) { // More than 24 hours
-        new Notification('Weight Entry Reminder', {
-            body: 'Don\'t forget to log your weight today!',
-            icon: './icons/scale-ico.png'
+    // Only send notification if:
+    // 1. It's been at least 6 hours since the last notification
+    // 2. User is not actively using the app (check last entry within 1 hour)
+    if (timeSinceLastNotification >= NOTIFICATION_INTERVAL && 
+        (!lastEntry || now - new Date(lastEntry.date).getTime() > 3600000)) {
+        
+        // Get random message from array
+        const message = NOTIFICATION_MESSAGES[Math.floor(Math.random() * NOTIFICATION_MESSAGES.length)];
+        
+        new Notification('WeightTracker', {
+            body: message,
+            icon: './icons/scale-ico.png',
+            badge: './icons/love-ico-weight.png',
+            tag: 'weight-reminder', // Prevents multiple notifications from stacking
+            renotify: true // Allows new notifications to replace old ones
         });
+        
+        // Update the last notification time
+        localStorage.setItem('lastNotificationTime', now.toString());
     }
 }
 
