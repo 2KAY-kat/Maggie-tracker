@@ -745,8 +745,6 @@ function stopActivityTracking() {
     lastLocation = null;
     startTime = null;
 }
-
-// steps tracking based onn curent from old location on the geographiical position
 function updatePosition(position) {
     const currentLocation = {
         lat: position.coords.latitude,
@@ -754,19 +752,38 @@ function updatePosition(position) {
     };
 
     if (lastLocation) {
-        // Calculate distance between points
         const distance = calculateDistance(lastLocation, currentLocation);
-        totalDistance += distance;
 
-        // Estimate steps (average stride length is about 0.7 meters)
-        const steps = Math.round(distance * 1000 / 0.7);
-        totalSteps += steps;
+        // Ignore GPS noise below ~3 meters
+        if (distance > 0.003) {
+            totalDistance += distance;
 
-        // Update UI
-        updateActivityStats(position.coords.speed || calculateSpeed(distance));
+            // Use profile height for stride length if available, else fallback
+            const profileHeight = parseFloat(localStorage.getItem("profileHeight")) || 170; // cm
+            const strideLength = profileHeight * 0.415 / 100; // meters
+            const steps = Math.round((distance * 1000) / strideLength);
+            totalSteps += steps;
+
+            // Update UI with either GPS speed or calculated speed
+            const currentSpeed = position.coords.speed
+                ? position.coords.speed * 3.6 // convert m/s to km/h
+                : calculateSpeed(distance);
+
+            updateActivityStats(currentSpeed);
+        }
     }
 
     lastLocation = currentLocation;
+}
+
+// MET calculator for calories
+function getMET(speed) {
+    if (speed < 3) return 2.0;   // slow walk
+    if (speed < 5) return 3.5;   // brisk walk
+    if (speed < 7) return 5.0;   // power walk
+    if (speed < 9) return 8.0;   // jogging
+    if (speed < 12) return 11.0; // running
+    return 14.0;                 // sprinting
 }
 
 function calculateDistance(point1, point2) {
@@ -795,10 +812,9 @@ function updateActivityStats(speed) {
     document.getElementById('stepsToday').textContent = totalSteps.toString();
     document.getElementById('currentSpeed').textContent = `${speed.toFixed(1)} km/h`;
 
-    // Calculate calories burned (rough estimation)
-    // MET value for running varies from 7-14 depending on speed
-    const met = speed < 8 ? 7 : speed < 12 ? 10 : 14;
-    const weight = weightData[0]?.weight || 70; // Use current weight or default to 70kg
+    // Calories burned
+    const met = getMET(speed);
+    const weight = weightData[0]?.weight || 70; // fallback if no user weight
     const duration = (Date.now() - startTime) / 3600000; // hours
     const calories = met * weight * duration;
 
