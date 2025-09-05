@@ -506,7 +506,7 @@ function scheduleReminders() {
         localStorage.setItem('lastNotificationTime', now.toString());
     }
 }
-
+/** startting of copied code incase am lost **/
 // Initialize the app after all 
 function init() {
     // Set the current date as default
@@ -667,12 +667,14 @@ function updateOnlineStatus() {
         connectionStatus.classList.add('text-green-600');
         connectionStatus.classList.remove('text-red-600');
     } else {
-        connectionStatus.textContent = 'Offline - Changes will sync when you reconnect';
+        connectionStatus.textContent = 'Offline - Using local data';
         connectionStatus.classList.add('text-red-600');
         connectionStatus.classList.remove('text-green-600');
-        showToast('You are currently offline. Changes will be saved locally.', 'info');
+        showToast('You are offline. All activity is stored locally.', 'info');
     }
 }
+window.addEventListener('online', updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
 
 // the activity tracker variables for distance, number of steps ....
 let isTracking = false;
@@ -682,8 +684,47 @@ let watchId = null;
 let totalDistance = 0;
 let totalSteps = 0;
 let lastLocation = null;
+let lastUpdateTime = null;
 
-// the function to handle activity tracking
+// Accelerometer step detection
+let accelStepCount = 0;
+let lastAccel = { x: 0, y: 0, z: 0 };
+const stepThreshold = 1.2;
+
+// Idle detection
+let isIdle = false;
+const IDLE_SPEED_THRESHOLD = 1.0; // km/h
+const IDLE_ACCEL_THRESHOLD = 0.5; // m/s² minimal movement
+
+// GPS smoothing
+const gpsBuffer = [];
+const MAX_BUFFER = 5;
+const MAX_SPEED_KMH = 20;
+
+// Device motion handler to get accurate steps onnstep counter
+
+window.addEventListener('devicemotion', (event) => {
+    if (!isTracking) return;
+
+    const acc = event.accelerationIncludingGravity;
+    const delta = Math.sqrt(
+        Math.pow(acc.x - lastAccel.x, 2) +
+        Math.pow(acc.y - lastAccel.y, 2) +
+        Math.pow(acc.z - lastAccel.z, 2)
+    );
+
+    lastAccel = acc;
+
+    // Idle detection
+    if (delta < IDLE_ACCEL_THRESHOLD) isIdle = true;
+    else isIdle = false;
+
+    // Only count reasonable steps if not idle
+    if (!isIdle && delta > stepThreshold && delta < 5.0) accelStepCount++;
+});
+
+// Start / Stop activity
+
 function startActivityTracking() {
     if (!navigator.geolocation) {
         showToast('Geolocation is not supported by your browser', 'error');
@@ -694,15 +735,14 @@ function startActivityTracking() {
     const activityStatus = document.getElementById('activityStatus');
 
     if (!isTracking) {
-        // Start tracking
         isTracking = true;
         startTime = Date.now();
+        lastUpdateTime = Date.now();
         startButton.textContent = 'Stop Tracking';
         startButton.classList.add('bg-red-600', 'hover:bg-red-700');
         startButton.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
         activityStatus.classList.remove('hidden');
 
-        // Start location tracking
         watchId = navigator.geolocation.watchPosition(
             updatePosition,
             (error) => showToast(`Location error: ${error.message}`, 'error'),
@@ -734,93 +774,77 @@ function stopActivityTracking() {
     startButton.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
     activityStatus.classList.add('hidden');
 
-    // Update weight based on calories burned
-    if (totalDistance > 0) {
-        updateWeightFromActivity();
-    }
+    if (totalDistance > 0) updateWeightFromActivity();
 
-    // Reset tracking variables
     totalDistance = 0;
     totalSteps = 0;
     lastLocation = null;
     startTime = null;
 }
+
 function updatePosition(position) {
-    const currentLocation = {
-        lat: position.coords.latitude,
-        lng: position.coords.longitude
-    };
+    const currentLocation = { lat: position.coords.latitude, lng: position.coords.longitude };
+    const now = Date.now();
 
     if (lastLocation) {
-        const distance = calculateDistance(lastLocation, currentLocation);
+        let gpsDistance = smoothGPS(currentLocation);
+        const durationHrs = (now - lastUpdateTime) / 3600000;
+        const speed = gpsDistance / durationHrs;
 
-        // Ignore GPS noise below ~3 meters
-        if (distance > 0.003) {
-            totalDistance += distance;
+        if (speed < IDLE_SPEED_THRESHOLD) isIdle = true;
+        else isIdle = false;
 
-            // Use profile height for stride length if available, else fallback
+        if (!isIdle) {
             const profileHeight = parseFloat(localStorage.getItem("profileHeight")) || 170; // cm
             const strideLength = profileHeight * 0.415 / 100; // meters
-            const steps = Math.round((distance * 1000) / strideLength);
-            totalSteps += steps;
+            const accelDistance = accelStepCount * strideLength;
 
-            // Update UI with either GPS speed or calculated speed
-            const currentSpeed = position.coords.speed
-                ? position.coords.speed * 3.6 // convert m/s to km/h
-                : calculateSpeed(distance);
+            const distance = (gpsDistance + accelDistance) / 2;
+            if (distance > 0.003) totalDistance += distance;
 
-            updateActivityStats(currentSpeed);
+            const gpsSteps = Math.round((gpsDistance * 1000) / strideLength);
+            totalSteps += gpsSteps + accelStepCount;
+
+            lastUpdateTime = now;
+            updateActivityStats(speed);
+            queueActivityUpdate();
         }
     }
 
     lastLocation = currentLocation;
+    accelStepCount = 0;
 }
 
-// MET calculator for calories
+// ---------------------
+// MET calories
+// ---------------------
 function getMET(speed) {
-    if (speed < 3) return 2.0;   // slow walk
-    if (speed < 5) return 3.5;   // brisk walk
-    if (speed < 7) return 5.0;   // power walk
-    if (speed < 9) return 8.0;   // jogging
-    if (speed < 12) return 11.0; // running
-    return 14.0;                 // sprinting
+    if (speed < 3) return 2.0;
+    if (speed < 5) return 3.5;
+    if (speed < 7) return 5.0;
+    if (speed < 9) return 8.0;
+    if (speed < 12) return 11.0;
+    return 14.0;
 }
 
-function calculateDistance(point1, point2) {
-    // Haversine formula to calculate distance between two points its all math 
-    const R = 6371; // Earth's radius in km
-    const dLat = toRad(point2.lat - point1.lat);
-    const dLon = toRad(point2.lng - point1.lng);
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(toRad(point1.lat)) * Math.cos(toRad(point2.lat)) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-}
-
-function toRad(degrees) {
-    return degrees * (Math.PI / 180);
-}
-
-function calculateSpeed(distance) {
-    const duration = (Date.now() - startTime) / 1000 / 3600; // hours
-    return distance / duration; // km/h
-}
-
+// ---------------------
+// Update UI stats
+// ---------------------
 function updateActivityStats(speed) {
     document.getElementById('distanceToday').textContent = `${totalDistance.toFixed(2)} km`;
     document.getElementById('stepsToday').textContent = totalSteps.toString();
     document.getElementById('currentSpeed').textContent = `${speed.toFixed(1)} km/h`;
 
-    // Calories burned
     const met = getMET(speed);
-    const weight = weightData[0]?.weight || 70; // fallback if no user weight
-    const duration = (Date.now() - startTime) / 3600000; // hours
-    const calories = met * weight * duration;
-
+    const weight = weightData[0]?.weight || 70;
+    const durationHrs = (Date.now() - startTime) / 3600000;
+    const calories = met * weight * durationHrs;
     document.getElementById('caloriesBurned').textContent = `${Math.round(calories)} kcal`;
 }
 
+// ---------------------
+// Activity duration
+// ---------------------
 function updateActivityDuration() {
     const duration = Date.now() - startTime;
     const minutes = Math.floor(duration / 60000);
@@ -829,9 +853,10 @@ function updateActivityDuration() {
         `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 }
 
+// ---------------------
+// Update weight from activity
+// ---------------------
 function updateWeightFromActivity() {
-    // Calculate weight loss from activity (rough estimation)
-    // 7700 calories = 1 kg of body fat
     const calories = parseInt(document.getElementById('caloriesBurned').textContent);
     const weightLoss = calories / 7700;
 
@@ -850,7 +875,7 @@ function updateWeightFromActivity() {
                 hour12: true
             });
         }
-        // Add new weight entry
+        // add new weight entry
         addWeightEntry(
             newWeight,
             getMalawiTimeString(),
@@ -858,6 +883,62 @@ function updateWeightFromActivity() {
         );
     }
 }
+
+// ---------------------
+// Distance helper
+// ---------------------
+function calculateDistance(p1, p2) {
+    const R = 6371;
+    const dLat = toRad(p2.lat - p1.lat);
+    const dLon = toRad(p2.lng - p1.lng);
+    const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(p1.lat)) * Math.cos(toRad(p2.lat)) *
+        Math.sin(dLon / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
+function toRad(degrees) { 
+    return degrees * (Math.PI / 180); 
+}
+
+// ---------------------
+// Offline queue using localStorage
+// ---------------------
+function queueActivityUpdate() {
+    const queue = JSON.parse(localStorage.getItem('activityQueue') || '[]');
+    queue.push({
+        timestamp: Date.now(),
+        distance: totalDistance,
+        steps: totalSteps,
+        calories: parseFloat(document.getElementById('caloriesBurned').textContent)
+    });
+    localStorage.setItem('activityQueue', JSON.stringify(queue));
+}
+
+// Load queue and restore totals on app start
+function loadActivityQueue() {
+    const queue = JSON.parse(localStorage.getItem('activityQueue') || '[]');
+    if (!queue.length) return;
+
+    let totalDist = 0, totalStepsCount = 0, totalCalories = 0;
+    queue.forEach(update => {
+        totalDist += update.distance;
+        totalStepsCount += update.steps;
+        totalCalories += update.calories;
+    });
+
+    totalDistance = totalDist;
+    totalSteps = totalStepsCount;
+
+    document.getElementById('distanceToday').textContent = `${totalDistance.toFixed(2)} km`;
+    document.getElementById('stepsToday').textContent = totalSteps.toString();
+    document.getElementById('caloriesBurned').textContent = `${Math.round(totalCalories)} kcal`;
+}
+
+// Initialize
+loadActivityQueue();
+updateOnlineStatus();
 
 // Weekly report generation
 function generateWeeklyReport() {
