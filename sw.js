@@ -1,3 +1,22 @@
+// export function registerServiceWorker() {
+//     if ('serviceWorker' in navigator) {
+//         navigator.serviceWorker.register('/sw.js')
+//             .then(registration => {
+//                 console.log('Service Worker registered', registration);
+
+//                 registration.onupdatefound = () => {
+//                     const installingWorker = registration.installing;
+//                     installingWorker.onstatechange = () => {
+//                         if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+//                             window.location.reload();
+//                         }
+//                     };
+//                 };
+//             })
+//             .catch(err => console.error('Service Worker registration failed:', err));
+//     }
+// }
+
 const CACHE_NAME = 'weight-tracker-cache-v1';
 const ASSETS_TO_CACHE = [
   '/',                     
