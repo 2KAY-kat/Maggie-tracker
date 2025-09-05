@@ -494,7 +494,7 @@ function scheduleReminders() {
         // Get random message from array
         const message = NOTIFICATION_MESSAGES[Math.floor(Math.random() * NOTIFICATION_MESSAGES.length)];
         
-        new Notification('WeightTracker', {
+        new Notification('WeightLess', {
             body: message,
             icon: './icons/scale-ico.png',
             badge: './icons/love-ico-weight.png',

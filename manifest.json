@@ -1,6 +1,6 @@
 {
-  "name": "WeightTracker",
-  "short_name": "WeightTracker",
+  "name": "WeightLess",
+  "short_name": "WeightLess",
   "description": "A simple and effective weight tracking application",
   "start_url": "./index.html",
   "display": "standalone",
