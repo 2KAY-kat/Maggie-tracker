@@ -118,18 +118,6 @@ function loadData() {
     }
 }
 
-// Simulate syncing data to the cloud
-function syncData() {
-    const syncStatus = document.getElementById('syncStatus');
-    syncStatus.classList.remove('hidden');
-
-    // Simulate network delay
-    setTimeout(() => {
-        syncStatus.classList.add('hidden');
-        showToast('Data synced to cloud', 'success');
-    }, 1500);
-}
-
 // Add a new weight entry
 function addWeightEntry(weight, date, notes) {
     weightData.push({
@@ -712,7 +700,7 @@ window.addEventListener('devicemotion', (event) => {
         Math.pow(acc.y - lastAccel.y, 2) +
         Math.pow(acc.z - lastAccel.z, 2)
     );
-
+// Ta4k$cH3dul3R pass for taskscheduler app 
     lastAccel = acc;
 
     // Idle detection
@@ -1347,5 +1335,34 @@ function updatePredictionUI(period, predictedWeight, currentWeight) {
     document.getElementById(`${element}Change`).className = 
         `text-sm ${change < 0 ? 'text-green-600' : 'text-red-600'}`;
 }
+
+function syncData() {
+    try {
+        // Save latest data to localStorage (weightData & activityQueue already maintained)
+        localStorage.setItem('weightData', JSON.stringify(weightData));
+        localStorage.setItem('activityQueue', JSON.stringify(
+            JSON.parse(localStorage.getItem('activityQueue') || '[]')
+        ));
+
+        // Refresh UI elements so user sees everything up to date
+        updateTrendsChart();
+        loadData();
+        updateTrendsChart();
+
+        showToast('All progress saved locally', 'success');
+    } catch (e) {
+        console.error('Error syncing data:', e);
+        showToast('Failed to save data locally', 'error');
+    }
+}
+
+window.addEventListener('beforeunload', syncData);
+
+// Optional: also auto-save when the app becomes hidden (mobile multitasking)
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+        syncData();
+    }
+});
 
 document.addEventListener('DOMContentLoaded', init);
