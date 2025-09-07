@@ -22,6 +22,9 @@
                 WeightLess
             </h1>
             <div class="flex items-center">
+                <button id="syncDataBtn" class="ml-4 px-3 mr-2 flex py-1 bg-white hover:bg-white-700 font-medium text-sm text-indigo-600 rounded-md transition">
+                    Sync Data
+                </button>
                 <button id="installButton" class="hidden bg-white text-indigo-600 px-3 py-1 rounded-md font-medium text-sm">Install App</button>
                 <button id="editProfile" class="ml-4 flex items-center text-sm text-white hover:text-gray-200">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
@@ -31,7 +34,7 @@
                     Edit Profile
                 </button>
             </div>
-         </div>
+        </div>
     </header>
 
     <main class="container mx-auto px-4 py-6 max-w-lg flex-grow">
@@ -117,6 +120,9 @@
                 </div>
                 <button id="startActivity" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200">
                     Start Tracking Activity
+                </button>
+                <button id="pauseActivity" class="hidden mt-2 px-4 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-700 text-white" onclick="togglePauseActivity()">
+                    Pause Activity
                 </button>
             </div>
         </section>
