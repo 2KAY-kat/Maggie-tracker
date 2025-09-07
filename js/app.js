@@ -584,7 +584,7 @@ function init() {
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
 
-    document.getElementById('startActivity').addEventListener('click', startActivityTracking);
+    // document.getElementById('startActivity').addEventListener('click', startActivityTracking);
 
     document.getElementById('editProfile').addEventListener('click', () => {
         // Pre-fill form with existing data
@@ -666,13 +666,16 @@ window.addEventListener('offline', updateOnlineStatus);
 
 // the activity tracker variables for distance, number of steps ....
 let isTracking = false;
+let isPaused = false;
 let activityTimer = null;
 let startTime = null;
+let pausedTime = 0;
+let pauseStart = null;
 let watchId = null;
 let totalDistance = 0;
 let totalSteps = 0;
 let lastLocation = null;
-let lastUpdateTime = null;
+
 
 // Accelerometer step detection
 let accelStepCount = 0;
@@ -723,31 +726,167 @@ function startActivityTracking() {
     const activityStatus = document.getElementById('activityStatus');
 
     if (!isTracking) {
+        // Start tracking fresh
         isTracking = true;
+        isPaused = false;
         startTime = Date.now();
-        lastUpdateTime = Date.now();
-        startButton.textContent = 'Stop Tracking';
-        startButton.classList.add('bg-red-600', 'hover:bg-red-700');
+        pausedTime = 0;
+
+        startButton.textContent = 'Pause Tracking';
+        startButton.classList.add('bg-yellow-600', 'hover:bg-yellow-700');
         startButton.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
         activityStatus.classList.remove('hidden');
 
+        // Start location tracking
         watchId = navigator.geolocation.watchPosition(
             updatePosition,
             (error) => showToast(`Location error: ${error.message}`, 'error'),
-            {
-                enableHighAccuracy: true,
-                maximumAge: 1000,
-                timeout: 5000
-            }
+            { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
         );
 
         // Start timer
         activityTimer = setInterval(updateActivityDuration, 1000);
+
+    } else if (!isPaused) {
+        // Pause tracking
+        pauseTracking();
+        startButton.textContent = 'Resume Tracking';
+        startButton.classList.remove('bg-yellow-600', 'hover:bg-yellow-700');
+        startButton.classList.add('bg-green-600', 'hover:bg-green-700');
+
     } else {
-        // Stop tracking
-        stopActivityTracking();
+        // Resume tracking
+        resumeTracking();
+        startButton.textContent = 'Pause Tracking';
+        startButton.classList.add('bg-yellow-600', 'hover:bg-yellow-700');
+        startButton.classList.remove('bg-green-600', 'hover:bg-green-700');
     }
 }
+
+function pauseTracking() {
+    isPaused = true;
+    pauseStart = Date.now();
+    clearInterval(activityTimer);
+    navigator.geolocation.clearWatch(watchId);
+    showToast('Tracking paused', 'info');
+}
+
+function resumeTracking() {
+    isPaused = false;
+    pausedTime += (Date.now() - pauseStart);
+
+    // Restart geolocation
+    watchId = navigator.geolocation.watchPosition(
+        updatePosition,
+        (error) => showToast(`Location error: ${error.message}`, 'error'),
+        { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
+    );
+
+    // Restart timer
+    activityTimer = setInterval(updateActivityDuration, 1000);
+    showToast('Tracking resumed', 'success');
+}
+
+function toggleStartPause() {
+    const startPauseBtn = document.getElementById('startPauseBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const activityStatus = document.getElementById('activityStatus');
+
+    if (!isTracking) {
+        // --- START ---
+        isTracking = true;
+        isPaused = false;
+        startTime = Date.now();
+        pausedTime = 0;
+
+        startPauseBtn.textContent = 'Pause Tracking';
+        startPauseBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+        startPauseBtn.classList.add('bg-yellow-600', 'hover:bg-yellow-700');
+        stopBtn.classList.remove('hidden');
+        activityStatus.classList.remove('hidden');
+
+        // Start location tracking
+        watchId = navigator.geolocation.watchPosition(
+            updatePosition,
+            (error) => showToast(`Location error: ${error.message}`, 'error'),
+            { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
+        );
+
+        // Start timer
+        activityTimer = setInterval(updateActivityDuration, 1000);
+
+    } else if (!isPaused) {
+        // --- PAUSE ---
+        pauseTracking();
+        startPauseBtn.textContent = 'Resume Tracking';
+        startPauseBtn.classList.remove('bg-yellow-600', 'hover:bg-yellow-700');
+        startPauseBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+
+    } else {
+        // --- RESUME ---
+        resumeTracking();
+        startPauseBtn.textContent = 'Pause Tracking';
+        startPauseBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+        startPauseBtn.classList.add('bg-yellow-600', 'hover:bg-yellow-700');
+    }
+}
+
+function pauseTracking() {
+    isPaused = true;
+    pauseStart = Date.now();
+    clearInterval(activityTimer);
+    navigator.geolocation.clearWatch(watchId);
+    showToast('Tracking paused', 'info');
+}
+
+function resumeTracking() {
+    isPaused = false;
+    pausedTime += (Date.now() - pauseStart);
+
+    watchId = navigator.geolocation.watchPosition(
+        updatePosition,
+        (error) => showToast(`Location error: ${error.message}`, 'error'),
+        { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
+    );
+
+    activityTimer = setInterval(updateActivityDuration, 1000);
+    showToast('Tracking resumed', 'success');
+}
+
+function stopTracking() {
+    isTracking = false;
+    isPaused = false;
+    clearInterval(activityTimer);
+    navigator.geolocation.clearWatch(watchId);
+
+    const startPauseBtn = document.getElementById('startPauseBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const activityStatus = document.getElementById('activityStatus');
+
+    // Reset buttons
+    startPauseBtn.textContent = 'Start Tracking';
+    startPauseBtn.classList.remove('bg-yellow-600', 'hover:bg-yellow-700', 'bg-green-600', 'hover:bg-green-700');
+    startPauseBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+    stopBtn.classList.add('hidden');
+    activityStatus.classList.add('hidden');
+
+    // Update weight from calories burned (optional)
+    if (totalDistance > 0) {
+        updateWeightFromActivity();
+        queueActivityUpdate();
+    }
+
+    // Reset state
+    totalDistance = 0;
+    totalSteps = 0;
+    lastLocation = null;
+    startTime = null;
+    pausedTime = 0;
+    pauseStart = null;
+
+    showToast('Tracking stopped', 'info');
+}
+
 
 function stopActivityTracking() {
     isTracking = false;
@@ -803,6 +942,10 @@ function updatePosition(position) {
     accelStepCount = 0;
 }
 
+document.getElementById('startPauseBtn').addEventListener('click', toggleStartPause);
+document.getElementById('stopBtn').addEventListener('click', stopTracking);
+
+
 // ---------------------
 // MET calories
 // ---------------------
@@ -815,9 +958,6 @@ function getMET(speed) {
     return 14.0;
 }
 
-// ---------------------
-// Update UI stats
-// ---------------------
 function updateActivityStats(speed) {
     document.getElementById('distanceToday').textContent = `${totalDistance.toFixed(2)} km`;
     document.getElementById('stepsToday').textContent = totalSteps.toString();
@@ -825,25 +965,24 @@ function updateActivityStats(speed) {
 
     const met = getMET(speed);
     const weight = weightData[0]?.weight || 70;
-    const durationHrs = (Date.now() - startTime) / 3600000;
-    const calories = met * weight * durationHrs;
+
+    const durationHrs = (Date.now() - startTime - pausedTime) / 3600000;
+
+    const calories = met * weight * Math.max(durationHrs, 0); 
     document.getElementById('caloriesBurned').textContent = `${Math.round(calories)} kcal`;
 }
 
-// ---------------------
-// Activity duration
-// ---------------------
+
 function updateActivityDuration() {
-    const duration = Date.now() - startTime;
+    const duration = Date.now() - startTime - pausedTime; 
     const minutes = Math.floor(duration / 60000);
     const seconds = Math.floor((duration % 60000) / 1000);
+
     document.getElementById('activityDuration').textContent =
         `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 }
 
-// ---------------------
-// Update weight from activity
-// ---------------------
+
 function updateWeightFromActivity() {
     const calories = parseInt(document.getElementById('caloriesBurned').textContent);
     const weightLoss = calories / 7700;
@@ -890,25 +1029,23 @@ function toRad(degrees) {
     return degrees * (Math.PI / 180); 
 }
 
-// ---------------------
-// Offline queue using localStorage
-// ---------------------
 function queueActivityUpdate() {
     const queue = JSON.parse(localStorage.getItem('activityQueue') || '[]');
     queue.push({
         timestamp: Date.now(),
         distance: totalDistance,
         steps: totalSteps,
-        calories: parseFloat(document.getElementById('caloriesBurned').textContent)
+        calories: parseFloat(document.getElementById('caloriesBurned').textContent) || 0
     });
     localStorage.setItem('activityQueue', JSON.stringify(queue));
 }
 
-// Load queue and restore totals on app start
+// Load activity queue and restore stats on app startup
 function loadActivityQueue() {
     const queue = JSON.parse(localStorage.getItem('activityQueue') || '[]');
     if (!queue.length) return;
 
+    // Calculate totals from stored activity updates
     let totalDist = 0, totalStepsCount = 0, totalCalories = 0;
     queue.forEach(update => {
         totalDist += update.distance;
@@ -916,9 +1053,11 @@ function loadActivityQueue() {
         totalCalories += update.calories;
     });
 
+    // Restore global variables
     totalDistance = totalDist;
     totalSteps = totalStepsCount;
 
+    // Update UI
     document.getElementById('distanceToday').textContent = `${totalDistance.toFixed(2)} km`;
     document.getElementById('stepsToday').textContent = totalSteps.toString();
     document.getElementById('caloriesBurned').textContent = `${Math.round(totalCalories)} kcal`;
