@@ -691,7 +691,7 @@ let lastLocation = null;
 
 // Accelerometer step detection
 let accelStepCount = 0;
-let lastAccel = { x: 0, y: 0 };
+let lastAccel = { x: 0, y: 0, z: 0 }; // added z init to avoid undefined in calculations
 const stepThreshold = 1.2;
 
 // Idle detection
@@ -704,30 +704,48 @@ let lastUpdateTime = Date.now();
 let gpsBuffer = [];
 const MAX_BUFFER_SIZE = 5;
 const MIN_GPS_ACCURACY = 20; // meters
+const MAX_SPEED_KMH = 60; // safety cap for GPS speed (define a sensible max)
 
 // Device motion handler to get accurate steps onnstep counter
 
 window.addEventListener('devicemotion', (event) => {
     if (!isTracking) return;
 
-    const acc = event.accelerationIncludingGravity;
-    const delta = Math.sqrt(
-        Math.pow(acc.x - lastAccel.x, 2) +
-        Math.pow(acc.y - lastAccel.y, 2) +
-        Math.pow(acc.z - lastAccel.z, 2)
-    );
-// Ta4k$cH3dul3R pass for taskscheduler app 
+    // prefer accelerationIncludingGravity, fallback to acceleration, fallback to zeros
+    const srcAcc = event.accelerationIncludingGravity || event.acceleration || { x: 0, y: 0, z: 0 };
+    const acc = {
+        x: (srcAcc.x ?? 0),
+        y: (srcAcc.y ?? 0),
+        z: (srcAcc.z ?? 0)
+    };
+
+    const dx = acc.x - (lastAccel.x ?? 0);
+    const dy = acc.y - (lastAccel.y ?? 0);
+    const dz = acc.z - (lastAccel.z ?? 0);
+
+    const delta = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
     lastAccel = acc;
 
     // Idle detection
-    if (delta < IDLE_ACCEL_THRESHOLD) isIdle = true;
-    else isIdle = false;
+    isIdle = delta < IDLE_ACCEL_THRESHOLD;
 
-    // Only count reasonable steps if not idle
-    if (!isIdle && delta > stepThreshold && delta < 5.0) accelStepCount++;
+    // Only count reasonable steps if not idle and delta within expected range
+    if (!isIdle && delta > stepThreshold && delta < 5.0) {
+        accelStepCount++;
+        totalSteps = accelStepCount; // keep totalSteps in sync (if desired)
+    }
 });
 
 // Start / Stop activity
+
+function startActivityTracking() {
+    toggleStartPause();
+}
+
+function stopActivityTracking() {
+    stopTracking();
+}
 
 function startActivityTracking() {
     if (!navigator.geolocation) {
@@ -777,35 +795,42 @@ function startActivityTracking() {
 }
 
 function pauseTracking() {
+    if (!isTracking || isPaused) return;
     isPaused = true;
     pauseStart = Date.now();
     clearInterval(activityTimer);
-    navigator.geolocation.clearWatch(watchId);
+    if (watchId != null && navigator.geolocation) navigator.geolocation.clearWatch(watchId);
     
-    // Update UI
     const startPauseBtn = document.getElementById('startPauseBtn');
-    startPauseBtn.textContent = 'Resume Tracking';
-    startPauseBtn.classList.remove('bg-yellow-600', 'hover:bg-yellow-700');
-    startPauseBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+    if (startPauseBtn) {
+        startPauseBtn.textContent = 'Resume Tracking';
+        startPauseBtn.classList.remove('bg-yellow-600', 'hover:bg-yellow-700');
+        startPauseBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+    }
     
     showToast('Tracking paused', 'info');
 }
 
 function resumeTracking() {
+    if (!isTracking || !isPaused) return;
     isPaused = false;
-    pausedTime += (Date.now() - pauseStart);
+    pausedTime += (Date.now() - (pauseStart || Date.now()));
+    pauseStart = null;
 
-    watchId = navigator.geolocation.watchPosition(
-        updatePosition,
-        (error) => showToast(`Location error: ${error.message}`, 'error'),
-        { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
-    );
+    if (navigator.geolocation) {
+        watchId = navigator.geolocation.watchPosition(
+            updatePosition,
+            (error) => showToast(`Location error: ${error.message}`, 'error'),
+            { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
+        );
+    }
 
-    // Update UI
     const startPauseBtn = document.getElementById('startPauseBtn');
-    startPauseBtn.textContent = 'Pause Tracking';
-    startPauseBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
-    startPauseBtn.classList.add('bg-yellow-600', 'hover:bg-yellow-700');
+    if (startPauseBtn) {
+        startPauseBtn.textContent = 'Pause Tracking';
+        startPauseBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+        startPauseBtn.classList.add('bg-yellow-600', 'hover:bg-yellow-700');
+    }
 
     activityTimer = setInterval(updateActivityDuration, 1000);
     showToast('Tracking resumed', 'success');
@@ -856,35 +881,42 @@ function toggleStartPause() {
 }
 
 function pauseTracking() {
+    if (!isTracking || isPaused) return;
     isPaused = true;
     pauseStart = Date.now();
     clearInterval(activityTimer);
-    navigator.geolocation.clearWatch(watchId);
+    if (watchId != null && navigator.geolocation) navigator.geolocation.clearWatch(watchId);
     
-    // Update UI
     const startPauseBtn = document.getElementById('startPauseBtn');
-    startPauseBtn.textContent = 'Resume Tracking';
-    startPauseBtn.classList.remove('bg-yellow-600', 'hover:bg-yellow-700');
-    startPauseBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+    if (startPauseBtn) {
+        startPauseBtn.textContent = 'Resume Tracking';
+        startPauseBtn.classList.remove('bg-yellow-600', 'hover:bg-yellow-700');
+        startPauseBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+    }
     
     showToast('Tracking paused', 'info');
 }
 
 function resumeTracking() {
+    if (!isTracking || !isPaused) return;
     isPaused = false;
-    pausedTime += (Date.now() - pauseStart);
+    pausedTime += (Date.now() - (pauseStart || Date.now()));
+    pauseStart = null;
 
-    watchId = navigator.geolocation.watchPosition(
-        updatePosition,
-        (error) => showToast(`Location error: ${error.message}`, 'error'),
-        { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
-    );
+    if (navigator.geolocation) {
+        watchId = navigator.geolocation.watchPosition(
+            updatePosition,
+            (error) => showToast(`Location error: ${error.message}`, 'error'),
+            { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
+        );
+    }
 
-    // Update UI
     const startPauseBtn = document.getElementById('startPauseBtn');
-    startPauseBtn.textContent = 'Pause Tracking';
-    startPauseBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
-    startPauseBtn.classList.add('bg-yellow-600', 'hover:bg-yellow-700');
+    if (startPauseBtn) {
+        startPauseBtn.textContent = 'Pause Tracking';
+        startPauseBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+        startPauseBtn.classList.add('bg-yellow-600', 'hover:bg-yellow-700');
+    }
 
     activityTimer = setInterval(updateActivityDuration, 1000);
     showToast('Tracking resumed', 'success');
@@ -996,11 +1028,11 @@ function updateActivityStats(speed) {
     document.getElementById('currentSpeed').textContent = `${speed.toFixed(1)} km/h`;
 
     const met = getMET(speed);
-    const weight = weightData[0]?.weight || 70;
+    const weight = parseFloat(weightData[0]?.weight) || 70;
 
-    const durationHrs = (Date.now() - startTime - pausedTime) / 3600000;
+    const durationHrs = Math.max((Date.now() - (startTime || Date.now()) - (pausedTime || 0)) / 3600000, 0);
 
-    const calories = met * weight * Math.max(durationHrs, 0); 
+    const calories = met * weight * durationHrs;
     document.getElementById('caloriesBurned').textContent = `${Math.round(calories)} kcal`;
 }
 
@@ -1063,11 +1095,14 @@ function toRad(degrees) {
 
 function queueActivityUpdate() {
     const queue = JSON.parse(localStorage.getItem('activityQueue') || '[]');
+    const caloriesText = document.getElementById('caloriesBurned')?.textContent || '0';
+    const caloriesValue = parseFloat((caloriesText+'').replace(/[^\d.-]/g, ''))
+
     queue.push({
         timestamp: Date.now(),
         distance: totalDistance,
         steps: totalSteps,
-        calories: parseFloat(document.getElementById('caloriesBurned').textContent) || 0
+        calories: caloriesValue
     });
     localStorage.setItem('activityQueue', JSON.stringify(queue));
 }
@@ -1570,3 +1605,9 @@ function smoothGPS(currentLocation) {
     const smoothedDistance = gpsBuffer.reduce((a, b) => a + b, 0) / gpsBuffer.length;
     return Math.min(smoothedDistance, MAX_SPEED_KMH / 3600); 
 }
+
+const spBtn = document.getElementById('startPauseBtn');
+if (spBtn) spBtn.addEventListener('click', toggleStartPause);
+
+const sBtn = document.getElementById('stopBtn');
+if (sBtn) sBtn.addEventListener('click', stopTracking);
