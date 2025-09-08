@@ -730,10 +730,17 @@ window.addEventListener('devicemotion', (event) => {
     // Idle detection
     isIdle = delta < IDLE_ACCEL_THRESHOLD;
 
-    // Only count reasonable steps if not idle and delta within expected range
-    if (!isIdle && delta > stepThreshold && delta < 5.0) {
+    // Debounced step detection
+    const now = Date.now();
+    if (
+        !isIdle &&
+        delta > stepThreshold &&
+        delta < 5.0 &&
+        (now - lastStepTime) > MIN_STEP_INTERVAL_MS
+    ) {
         accelStepCount++;
-        totalSteps = accelStepCount; // keep totalSteps in sync (if desired)
+        totalSteps = accelStepCount;
+        lastStepTime = now;
     }
 });
 
@@ -1594,7 +1601,6 @@ function smoothGPS(currentLocation) {
     if (!lastLocation) return 0;
 
     const distance = calculateDistance(lastLocation, currentLocation);
-    
     // Add to buffer
     gpsBuffer.push(distance);
     if (gpsBuffer.length > MAX_BUFFER_SIZE) {
@@ -1603,7 +1609,13 @@ function smoothGPS(currentLocation) {
 
     // Calculate smoothed distance
     const smoothedDistance = gpsBuffer.reduce((a, b) => a + b, 0) / gpsBuffer.length;
-    return Math.min(smoothedDistance, MAX_SPEED_KMH / 3600); 
+
+    // Compute allowed max distance for the elapsed interval (km)
+    const now = Date.now();
+    const deltaSeconds = Math.max(1, (now - lastUpdateTime) / 1000); // avoid zero
+    const maxDistanceForInterval = (MAX_SPEED_KMH * deltaSeconds) / 3600; // km
+
+    return Math.min(smoothedDistance, maxDistanceForInterval);
 }
 
 const spBtn = document.getElementById('startPauseBtn');
