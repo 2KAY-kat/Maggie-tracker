@@ -645,6 +645,18 @@ function init() {
             }
         }
     }
+
+    // Cleanup any existing timers
+    if (activityTimer) {
+        clearInterval(activityTimer);
+        activityTimer = null;
+    }
+
+    // Cleanup any existing GPS watch
+    if (watchId) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+    }
 }
 
 // Update online status indicator
@@ -679,7 +691,7 @@ let lastLocation = null;
 
 // Accelerometer step detection
 let accelStepCount = 0;
-let lastAccel = { x: 0, y: 0, z: 0 };
+let lastAccel = { x: 0, y: 0 };
 const stepThreshold = 1.2;
 
 // Idle detection
@@ -688,9 +700,10 @@ const IDLE_SPEED_THRESHOLD = 1.0; // km/h
 const IDLE_ACCEL_THRESHOLD = 0.5; // m/s² minimal movement
 
 // GPS smoothing
-const gpsBuffer = [];
-const MAX_BUFFER = 5;
-const MAX_SPEED_KMH = 20;
+let lastUpdateTime = Date.now();
+let gpsBuffer = [];
+const MAX_BUFFER_SIZE = 5;
+const MIN_GPS_ACCURACY = 20; // meters
 
 // Device motion handler to get accurate steps onnstep counter
 
@@ -768,6 +781,13 @@ function pauseTracking() {
     pauseStart = Date.now();
     clearInterval(activityTimer);
     navigator.geolocation.clearWatch(watchId);
+    
+    // Update UI
+    const startPauseBtn = document.getElementById('startPauseBtn');
+    startPauseBtn.textContent = 'Resume Tracking';
+    startPauseBtn.classList.remove('bg-yellow-600', 'hover:bg-yellow-700');
+    startPauseBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+    
     showToast('Tracking paused', 'info');
 }
 
@@ -775,14 +795,18 @@ function resumeTracking() {
     isPaused = false;
     pausedTime += (Date.now() - pauseStart);
 
-    // Restart geolocation
     watchId = navigator.geolocation.watchPosition(
         updatePosition,
         (error) => showToast(`Location error: ${error.message}`, 'error'),
         { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
     );
 
-    // Restart timer
+    // Update UI
+    const startPauseBtn = document.getElementById('startPauseBtn');
+    startPauseBtn.textContent = 'Pause Tracking';
+    startPauseBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+    startPauseBtn.classList.add('bg-yellow-600', 'hover:bg-yellow-700');
+
     activityTimer = setInterval(updateActivityDuration, 1000);
     showToast('Tracking resumed', 'success');
 }
@@ -836,6 +860,13 @@ function pauseTracking() {
     pauseStart = Date.now();
     clearInterval(activityTimer);
     navigator.geolocation.clearWatch(watchId);
+    
+    // Update UI
+    const startPauseBtn = document.getElementById('startPauseBtn');
+    startPauseBtn.textContent = 'Resume Tracking';
+    startPauseBtn.classList.remove('bg-yellow-600', 'hover:bg-yellow-700');
+    startPauseBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+    
     showToast('Tracking paused', 'info');
 }
 
@@ -848,6 +879,12 @@ function resumeTracking() {
         (error) => showToast(`Location error: ${error.message}`, 'error'),
         { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
     );
+
+    // Update UI
+    const startPauseBtn = document.getElementById('startPauseBtn');
+    startPauseBtn.textContent = 'Pause Tracking';
+    startPauseBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+    startPauseBtn.classList.add('bg-yellow-600', 'hover:bg-yellow-700');
 
     activityTimer = setInterval(updateActivityDuration, 1000);
     showToast('Tracking resumed', 'success');
@@ -906,42 +943,37 @@ function stopActivityTracking() {
     totalDistance = 0;
     totalSteps = 0;
     lastLocation = null;
-    startTime = null;
 }
 
 function updatePosition(position) {
-    const currentLocation = { lat: position.coords.latitude, lng: position.coords.longitude };
+    if (!isTracking || isPaused) return;
+
+    const accuracy = position.coords.accuracy;
+    if (accuracy > MIN_GPS_ACCURACY) {
+        showToast('Waiting for better GPS signal...', 'info');
+        return;
+    }
+
+    const currentLocation = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude
+    };
     const now = Date.now();
 
     if (lastLocation) {
-        let gpsDistance = smoothGPS(currentLocation);
+        const distance = smoothGPS(currentLocation);
         const durationHrs = (now - lastUpdateTime) / 3600000;
-        const speed = gpsDistance / durationHrs;
+        const speed = distance / durationHrs;
 
-        if (speed < IDLE_SPEED_THRESHOLD) isIdle = true;
-        else isIdle = false;
-
-        if (!isIdle) {
-            const profileHeight = parseFloat(localStorage.getItem("profileHeight")) || 170; // cm
-            const strideLength = profileHeight * 0.415 / 100; // meters
-            const accelDistance = accelStepCount * strideLength;
-
-            const distance = (gpsDistance + accelDistance) / 2;
-            if (distance > 0.003) totalDistance += distance;
-
-            const gpsSteps = Math.round((gpsDistance * 1000) / strideLength);
-            totalSteps += gpsSteps + accelStepCount;
-
-            lastUpdateTime = now;
+        if (!isIdle && speed <= MAX_SPEED_KMH) {
+            totalDistance += distance;
             updateActivityStats(speed);
-            queueActivityUpdate();
         }
     }
 
     lastLocation = currentLocation;
-    accelStepCount = 0;
+    lastUpdateTime = now;
 }
-
 document.getElementById('startPauseBtn').addEventListener('click', toggleStartPause);
 document.getElementById('stopBtn').addEventListener('click', stopTracking);
 
@@ -1099,10 +1131,18 @@ function generateWeeklyReport() {
 
 function showWeeklyReport(report) {
     const weeklyReport = document.getElementById('weeklyReport');
-    if (!weeklyReport || weightData.length < 2) return;
+    if (!weeklyReport || !report) return;
 
     const weeklyStats = calculateWeeklyStats();
-    
+    if (!weeklyStats) {
+        weeklyReport.innerHTML = `
+            <div class="text-center text-gray-500 py-4">
+                Not enough data for weekly report
+            </div>
+        `;
+        return;
+    }
+
     weeklyReport.innerHTML = `
         <div class="space-y-3">
             <h3 class="font-medium text-gray-700">Weekly Progress Summary</h3>
@@ -1285,18 +1325,28 @@ document.getElementById('profileModal').addEventListener('click', function (e) {
 });
 
 function validateProfileData(profile) {
-    if (!profile.height || profile.height <= 0) {
-        throw new Error('Invalid height');
+    const errors = [];
+    
+    if (!profile.height || profile.height <= 0 || profile.height > 300) {
+        errors.push('Height must be between 1 and 300 cm');
     }
-    if (!profile.age || profile.age <= 0) {
-        throw new Error('Invalid age');
+    
+    if (!profile.age || profile.age <= 0 || profile.age > 150) {
+        errors.push('Age must be between 1 and 150 years');
     }
+    
     if (!profile.gender || !['male', 'female', 'other'].includes(profile.gender)) {
-        throw new Error('Invalid gender');
+        errors.push('Please select a valid gender');
     }
+    
     if (!profile.activityLevel || !['sedentary', 'light', 'moderate', 'very', 'extra'].includes(profile.activityLevel)) {
-        throw new Error('Invalid activity level');
+        errors.push('Please select a valid activity level');
     }
+
+    if (errors.length > 0) {
+        throw new Error(errors.join('\n'));
+    }
+    
     return true;
 }
 
@@ -1497,7 +1547,6 @@ function syncData() {
 
 window.addEventListener('beforeunload', syncData);
 
-// Optional: also auto-save when the app becomes hidden (mobile multitasking)
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
         syncData();
@@ -1505,3 +1554,19 @@ document.addEventListener('visibilitychange', () => {
 });
 
 document.addEventListener('DOMContentLoaded', init);
+
+function smoothGPS(currentLocation) {
+    if (!lastLocation) return 0;
+
+    const distance = calculateDistance(lastLocation, currentLocation);
+    
+    // Add to buffer
+    gpsBuffer.push(distance);
+    if (gpsBuffer.length > MAX_BUFFER_SIZE) {
+        gpsBuffer.shift();
+    }
+
+    // Calculate smoothed distance
+    const smoothedDistance = gpsBuffer.reduce((a, b) => a + b, 0) / gpsBuffer.length;
+    return Math.min(smoothedDistance, MAX_SPEED_KMH / 3600); 
+}
