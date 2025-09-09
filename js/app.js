@@ -925,10 +925,16 @@ function updatePosition(position) {
     const now = Date.now();
 
     if (lastLocation) {
-        const distance = smoothGPS(currentLocation);
-        const durationHrs = (now - lastUpdateTime) / 3600000;
-        const speed = distance / durationHrs;
+        // smoothGPS returns distance in km (smoothed)
+        const distance = smoothGPS(currentLocation); // km
 
+        // compute delta seconds safely 
+        const deltaSeconds = Math.max(1, (now - lastUpdateTime) / 1000);
+
+        // speed in km/h = (distance km) * 3600 / deltaSeconds
+        const speed = (distance * 3600) / deltaSeconds;
+
+        // only accept reasonable speeds and when not idle
         if (!isIdle && speed <= MAX_SPEED_KMH) {
             totalDistance += distance;
             updateActivityStats(speed);
