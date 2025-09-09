@@ -758,67 +758,20 @@ function stopActivityTracking() {
     stopTracking();
 }
 
-function startActivityTracking() {
-    if (!navigator.geolocation) {
-        showToast('Geolocation is not supported by your browser', 'error');
-        return;
-    }
-
-    const startButton = document.getElementById('startActivity');
-    const activityStatus = document.getElementById('activityStatus');
-
-    if (!isTracking) {
-        // Start tracking fresh
-        isTracking = true;
-        isPaused = false;
-        startTime = Date.now();
-        pausedTime = 0;
-
-        startButton.textContent = 'Pause Tracking';
-        startButton.classList.add('bg-yellow-600', 'hover:bg-yellow-700');
-        startButton.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
-        activityStatus.classList.remove('hidden');
-
-        // Start location tracking
-        watchId = navigator.geolocation.watchPosition(
-            updatePosition,
-            (error) => showToast(`Location error: ${error.message}`, 'error'),
-            { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
-        );
-
-        // Start timer
-        activityTimer = setInterval(updateActivityDuration, 1000);
-
-    } else if (!isPaused) {
-        // Pause tracking
-        pauseTracking();
-        startButton.textContent = 'Resume Tracking';
-        startButton.classList.remove('bg-yellow-600', 'hover:bg-yellow-700');
-        startButton.classList.add('bg-green-600', 'hover:bg-green-700');
-
-    } else {
-        // Resume tracking
-        resumeTracking();
-        startButton.textContent = 'Pause Tracking';
-        startButton.classList.add('bg-yellow-600', 'hover:bg-yellow-700');
-        startButton.classList.remove('bg-green-600', 'hover:bg-green-700');
-    }
-}
-
 function pauseTracking() {
     if (!isTracking || isPaused) return;
     isPaused = true;
     pauseStart = Date.now();
     clearInterval(activityTimer);
     if (watchId != null && navigator.geolocation) navigator.geolocation.clearWatch(watchId);
-    
+
     const startPauseBtn = document.getElementById('startPauseBtn');
     if (startPauseBtn) {
         startPauseBtn.textContent = 'Resume Tracking';
         startPauseBtn.classList.remove('bg-yellow-600', 'hover:bg-yellow-700');
         startPauseBtn.classList.add('bg-green-600', 'hover:bg-green-700');
     }
-    
+
     showToast('Tracking paused', 'info');
 }
 
@@ -859,18 +812,22 @@ function toggleStartPause() {
         startTime = Date.now();
         pausedTime = 0;
 
-        startPauseBtn.textContent = 'Pause Tracking';
-        startPauseBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
-        startPauseBtn.classList.add('bg-yellow-600', 'hover:bg-yellow-700');
-        stopBtn.classList.remove('hidden');
-        activityStatus.classList.remove('hidden');
+        if (startPauseBtn) {
+            startPauseBtn.textContent = 'Pause Tracking';
+            startPauseBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+            startPauseBtn.classList.add('bg-yellow-600', 'hover:bg-yellow-700');
+        }
+        if (stopBtn) stopBtn.classList.remove('hidden');
+        if (activityStatus) activityStatus.classList.remove('hidden');
 
         // Start location tracking
-        watchId = navigator.geolocation.watchPosition(
-            updatePosition,
-            (error) => showToast(`Location error: ${error.message}`, 'error'),
-            { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
-        );
+        if (navigator.geolocation) {
+            watchId = navigator.geolocation.watchPosition(
+                updatePosition,
+                (error) => showToast(`Location error: ${error.message}`, 'error'),
+                { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
+            );
+        }
 
         // Start timer
         activityTimer = setInterval(updateActivityDuration, 1000);
@@ -878,77 +835,41 @@ function toggleStartPause() {
     } else if (!isPaused) {
         // --- PAUSE ---
         pauseTracking();
-        startPauseBtn.textContent = 'Resume Tracking';
-        startPauseBtn.classList.remove('bg-yellow-600', 'hover:bg-yellow-700');
-        startPauseBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+        if (startPauseBtn) {
+            startPauseBtn.textContent = 'Resume Tracking';
+            startPauseBtn.classList.remove('bg-yellow-600', 'hover:bg-yellow-700');
+            startPauseBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+        }
 
     } else {
         // --- RESUME ---
         resumeTracking();
-        startPauseBtn.textContent = 'Pause Tracking';
-        startPauseBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
-        startPauseBtn.classList.add('bg-yellow-600', 'hover:bg-yellow-700');
+        if (startPauseBtn) {
+            startPauseBtn.textContent = 'Pause Tracking';
+            startPauseBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+            startPauseBtn.classList.add('bg-yellow-600', 'hover:bg-yellow-700');
+        }
     }
-}
-
-function pauseTracking() {
-    if (!isTracking || isPaused) return;
-    isPaused = true;
-    pauseStart = Date.now();
-    clearInterval(activityTimer);
-    if (watchId != null && navigator.geolocation) navigator.geolocation.clearWatch(watchId);
-    
-    const startPauseBtn = document.getElementById('startPauseBtn');
-    if (startPauseBtn) {
-        startPauseBtn.textContent = 'Resume Tracking';
-        startPauseBtn.classList.remove('bg-yellow-600', 'hover:bg-yellow-700');
-        startPauseBtn.classList.add('bg-green-600', 'hover:bg-green-700');
-    }
-    
-    showToast('Tracking paused', 'info');
-}
-
-function resumeTracking() {
-    if (!isTracking || !isPaused) return;
-    isPaused = false;
-    pausedTime += (Date.now() - (pauseStart || Date.now()));
-    pauseStart = null;
-
-    if (navigator.geolocation) {
-        watchId = navigator.geolocation.watchPosition(
-            updatePosition,
-            (error) => showToast(`Location error: ${error.message}`, 'error'),
-            { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
-        );
-    }
-
-    const startPauseBtn = document.getElementById('startPauseBtn');
-    if (startPauseBtn) {
-        startPauseBtn.textContent = 'Pause Tracking';
-        startPauseBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
-        startPauseBtn.classList.add('bg-yellow-600', 'hover:bg-yellow-700');
-    }
-
-    activityTimer = setInterval(updateActivityDuration, 1000);
-    showToast('Tracking resumed', 'success');
 }
 
 function stopTracking() {
     isTracking = false;
     isPaused = false;
     clearInterval(activityTimer);
-    navigator.geolocation.clearWatch(watchId);
+    if (watchId != null && navigator.geolocation) navigator.geolocation.clearWatch(watchId);
 
     const startPauseBtn = document.getElementById('startPauseBtn');
     const stopBtn = document.getElementById('stopBtn');
     const activityStatus = document.getElementById('activityStatus');
 
-    // Reset buttons
-    startPauseBtn.textContent = 'Start Tracking';
-    startPauseBtn.classList.remove('bg-yellow-600', 'hover:bg-yellow-700', 'bg-green-600', 'hover:bg-green-700');
-    startPauseBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
-    stopBtn.classList.add('hidden');
-    activityStatus.classList.add('hidden');
+    // Reset buttons safely
+    if (startPauseBtn) {
+        startPauseBtn.textContent = 'Start Tracking';
+        startPauseBtn.classList.remove('bg-yellow-600', 'hover:bg-yellow-700', 'bg-green-600', 'hover:bg-green-700');
+        startPauseBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+    }
+    if (stopBtn) stopBtn.classList.add('hidden');
+    if (activityStatus) activityStatus.classList.add('hidden');
 
     // Update weight from calories burned (optional)
     if (totalDistance > 0) {
