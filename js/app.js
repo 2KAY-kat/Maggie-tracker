@@ -699,6 +699,10 @@ let isIdle = false;
 const IDLE_SPEED_THRESHOLD = 1.0; // km/h
 const IDLE_ACCEL_THRESHOLD = 0.5; // m/s² minimal movement
 
+// Debounce / step timing
+let lastStepTime = 0;
+const MIN_STEP_INTERVAL_MS = 300; // debounce between steps
+
 // GPS smoothing
 let lastUpdateTime = Date.now();
 let gpsBuffer = [];
